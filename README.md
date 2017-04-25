@@ -1,22 +1,18 @@
 node-audio-slicer
 =================
 
-Read, slice, and write back to disk audio files (supported formats: .wav and .mp3). Used e.g. for streaming service to prepare audio chunks for greedy clients.
+Read, slice, and write back audio files to disk (supported formats: .wav and .mp3). Used e.g. for streaming service to prepare audio chunks for greedy clients.
 
 Installation
 ------------
 
-You can install it with `npm`:
+npm install:
 
 ``` bash
 $ npm install --save node-audio-slicer
 ```
 
-This package relies on [node-lame](https://github.com/jankarres/node-lame) for mp3 encoding. node-lame requirements:
-
-* Linux or Mac OS (Windows is NOT tested by this package)
-* lame installed (instructions see node-lame repo)
-* node 6.9.* or newer
+This package relies on [node-lame](https://github.com/jankarres/node-lame) for mp3 encoding. Check the repository for requirements (no windows + lame installed at the moment).
 
 Examples
 --------

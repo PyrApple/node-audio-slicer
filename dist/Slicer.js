@@ -7,7 +7,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 Object.defineProperty(exports, "__esModule", { value: true });
 // const LameOptions_1 = require("./LameOptions");
 var fs = require("fs");
-var lame = require("node-lame").Lame;
+var Lame = require("node-lame").Lame;
 var StringDecoder = require('string_decoder').StringDecoder;
 
 var BYTE_LENGTH = 4;
@@ -77,7 +77,7 @@ var Slicer = function () {
 
           // encode
           if (extension === 'mp3') {
-            var encoder = new lame({ "output": chunkName, "bitrate": 128 });
+            var encoder = new Lame({ "output": chunkName, "bitrate": 128 });
             encoder.setBuffer(chunkBuffer);
             encoder.encode().then(function () {
               // to be able to tell when to call the output callback:

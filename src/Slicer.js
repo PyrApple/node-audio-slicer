@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 // const LameOptions_1 = require("./LameOptions");
 const fs = require("fs");
-const lame = require("node-lame").Lame;
+const Lame = require("node-lame").Lame;
 const StringDecoder = require('string_decoder').StringDecoder;
 
 const BYTE_LENGTH = 4;
@@ -62,7 +62,7 @@ class Slicer {
 
           // encode
           if( extension === 'mp3' ){
-            let encoder = new lame({ "output": chunkName, "bitrate": 128});
+            let encoder = new Lame({ "output": chunkName, "bitrate": 128});
             encoder.setBuffer(chunkBuffer);
             encoder.encode()
               .then( () => { 
