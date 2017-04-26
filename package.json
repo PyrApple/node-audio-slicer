@@ -40,7 +40,7 @@
   ],
   "dependencies": {
     "fs": "0.0.1-security",
-    "node-lame": "PyrApple/node-lame",
+    "node-lame": "^1.0.4",
     "string_decoder": "^1.0.0"
   },
   "devDependencies": {
