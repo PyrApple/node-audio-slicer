@@ -13,16 +13,20 @@ class Slicer {
     if( options === undefined ){ options = {}; }
     this.tmpPath = (options.tmpPath !== undefined) ? options.tmpPath : undefined;
     this.chunkDuration = (options.duration !== undefined) ? options.duration : 4; // chunk duration, in seconds
-    this.chunkFormat = (options.format !== undefined) ? options.format : 'auto'; // output chunk audio format
-    let supportedFormats = ['auto', 'mp3', 'wav'];
-    if( supportedFormats.indexOf(this.chunkFormat) == -1){
-      throw('audio format ' + this.chunkFormat + ' not supported must be in: ' + supportedFormats);
-    }
+    this.compress = (options.compress !== undefined) ? options.format :  true; // output chunk audio format
+    
     // locals
     this.reader = new Reader();
   }
 
   slice(inFilePath, callback) {
+    // only support wav and mp3 files
+    var inFileExtension = inFilePath.split(".").pop();
+    if( ['wav', 'mp3'].indexOf(inFileExtension) == -1){
+      console.error('format not supported:', inFileExtension);
+      return;
+    }
+    // load audio file
     this.reader.loadBuffer(inFilePath)
       .then((buffer) => {
         // get buffer chunk
@@ -32,13 +36,12 @@ class Slicer {
         let inPath = inFilePath.substr(0, inFilePath.lastIndexOf('/') + 1);
         let inFileName = inFilePath.split("/").pop();
         let inFileRadical = inFileName.substr(0, inFileName.lastIndexOf("."));
-
-        // auto switch to mp3 or wav if more than 2 channels
-        let extension = this.chunkFormat;
-        if( extension === 'auto' ){
-          if( metaBuffer.numberOfChannels <= 2 ){ extension = 'mp3'; }
-          else{ extension = 'wav'; }
-        }
+        
+        // set extension based on compression option (compress to mp3 if <= 2 channels)
+        let extension = inFileExtension;
+        if( this.compress && metaBuffer.numberOfChannels <= 2 ){
+          extension = 'mp3'; 
+        }        
 
         // init slicing loop 
         let totalDuration = metaBuffer.dataLength / metaBuffer.secToByteFactor;

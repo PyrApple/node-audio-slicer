@@ -57,14 +57,9 @@ describe('Slicer', () => {
 
   describe('Slice .wav file to mp3', () => {
     it('should slice wav into mp3 chunks', (done) => {
-    
-    let slicer = new Slicer({format:'auto'});
-
-    // assert.isTrue(true);
-    slicer.slice(INFILEPATH, (chunkList) => {
-        // console.log(chunkList);
-        done();
-      });
+      let slicer = new Slicer({compress:true});
+      slicer.slice(INFILEPATH, (chunkList) => { done(); });
     });
   });
+
 });
