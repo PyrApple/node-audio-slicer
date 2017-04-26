@@ -13,7 +13,7 @@ class Slicer {
     if( options === undefined ){ options = {}; }
     this.tmpPath = (options.tmpPath !== undefined) ? options.tmpPath : undefined;
     this.chunkDuration = (options.duration !== undefined) ? options.duration : 4; // chunk duration, in seconds
-    this.compress = (options.compress !== undefined) ? options.format :  true; // output chunk audio format
+    this.compress = (options.compress !== undefined) ? options.compress : true; // output chunk audio format
     
     // locals
     this.reader = new Reader();
@@ -22,10 +22,11 @@ class Slicer {
   slice(inFilePath, callback) {
     // only support wav and mp3 files
     var inFileExtension = inFilePath.split(".").pop();
-    if( ['wav', 'mp3'].indexOf(inFileExtension) == -1){
-      console.error('format not supported:', inFileExtension);
+    if( inFileExtension !== 'wav' ){
+      console.error('only supports wav files input');
       return;
     }
+
     // load audio file
     this.reader.loadBuffer(inFilePath)
       .then((buffer) => {
@@ -41,7 +42,11 @@ class Slicer {
         let extension = inFileExtension;
         if( this.compress && metaBuffer.numberOfChannels <= 2 ){
           extension = 'mp3'; 
-        }        
+        }     
+
+        // create sub-directory to store sliced files
+        let storeDirPath = inPath + inFileRadical;
+        if (!fs.existsSync(storeDirPath)){ fs.mkdirSync(storeDirPath); }
 
         // init slicing loop 
         let totalDuration = metaBuffer.dataLength / metaBuffer.secToByteFactor;
@@ -58,13 +63,15 @@ class Slicer {
           chunkDuration = Math.min(chunkDuration, totalDuration - chunkStartTime);
 
           // get chunk name
-          let chunkName = inPath + chunkIndex + '-' + inFileRadical + '.' + extension;
+          let chunkName = storeDirPath + '/' + chunkIndex + '-' + inFileRadical + '.' + extension;
 
           // get chunk buffer
           let chunkBuffer = this.getChunk(metaBuffer, chunkStartTime, chunkDuration);
 
-          // encode
+          // need mp3 outputs
+          console.log(extension)
           if( extension === 'mp3' ){
+            // need to encode segmented wav buffer to mp3
             let encoder = new Lame({ "output": chunkName, "bitrate": 128});
             encoder.setBuffer(chunkBuffer);
             encoder.encode()

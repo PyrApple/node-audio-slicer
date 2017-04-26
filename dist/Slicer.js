@@ -22,11 +22,8 @@ var Slicer = function () {
     }
     this.tmpPath = options.tmpPath !== undefined ? options.tmpPath : undefined;
     this.chunkDuration = options.duration !== undefined ? options.duration : 4; // chunk duration, in seconds
-    this.chunkFormat = options.format !== undefined ? options.format : 'auto'; // output chunk audio format
-    var supportedFormats = ['auto', 'mp3', 'wav'];
-    if (supportedFormats.indexOf(this.chunkFormat) == -1) {
-      throw 'audio format ' + this.chunkFormat + ' not supported must be in: ' + supportedFormats;
-    }
+    this.compress = options.compress !== undefined ? options.compress : true; // output chunk audio format
+
     // locals
     this.reader = new Reader();
   }
@@ -36,6 +33,14 @@ var Slicer = function () {
     value: function slice(inFilePath, callback) {
       var _this = this;
 
+      // only support wav and mp3 files
+      var inFileExtension = inFilePath.split(".").pop();
+      if (['wav', 'mp3'].indexOf(inFileExtension) == -1) {
+        console.error('format not supported:', inFileExtension);
+        return;
+      }
+
+      // load audio file
       this.reader.loadBuffer(inFilePath).then(function (buffer) {
         // get buffer chunk
         var metaBuffer = _this.reader.interpretHeaders(buffer);
@@ -45,14 +50,16 @@ var Slicer = function () {
         var inFileName = inFilePath.split("/").pop();
         var inFileRadical = inFileName.substr(0, inFileName.lastIndexOf("."));
 
-        // auto switch to mp3 or wav if more than 2 channels
-        var extension = _this.chunkFormat;
-        if (extension === 'auto') {
-          if (metaBuffer.numberOfChannels <= 2) {
-            extension = 'mp3';
-          } else {
-            extension = 'wav';
-          }
+        // set extension based on compression option (compress to mp3 if <= 2 channels)
+        var extension = inFileExtension;
+        if (_this.compress && metaBuffer.numberOfChannels <= 2) {
+          extension = 'mp3';
+        }
+
+        // create sub-directory to store sliced files
+        var storeDirPath = inPath + inFileRadical;
+        if (!fs.existsSync(storeDirPath)) {
+          fs.mkdirSync(storeDirPath);
         }
 
         // init slicing loop 
@@ -70,25 +77,46 @@ var Slicer = function () {
           chunkDuration = Math.min(chunkDuration, totalDuration - chunkStartTime);
 
           // get chunk name
-          var chunkName = inPath + chunkIndex + '-' + inFileRadical + '.' + extension;
+          var chunkName = storeDirPath + '/' + chunkIndex + '-' + inFileRadical + '.' + extension;
 
           // get chunk buffer
           var chunkBuffer = _this.getChunk(metaBuffer, chunkStartTime, chunkDuration);
 
-          // encode
+          // need mp3 outputs
+          console.log(extension);
           if (extension === 'mp3') {
-            var encoder = new Lame({ "output": chunkName, "bitrate": 128 });
-            encoder.setBuffer(chunkBuffer);
-            encoder.encode().then(function () {
-              // to be able to tell when to call the output callback:
-              totalEncodedTime += _this.chunkDuration;
-              // run arg callback only at encoding's very end 
-              if (totalEncodedTime >= totalDuration) {
-                callback(chunkList);
+            // need to encode segmented wav buffer to mp3
+            if (inFileExtension == 'wav') {
+              var encoder = new Lame({ "output": chunkName, "bitrate": 128 });
+              encoder.setBuffer(chunkBuffer);
+              encoder.encode().then(function () {
+                // to be able to tell when to call the output callback:
+                totalEncodedTime += _this.chunkDuration;
+                // run arg callback only at encoding's very end 
+                if (totalEncodedTime >= totalDuration) {
+                  callback(chunkList);
+                }
+              }).catch(function (err) {
+                console.error(err);
+              });
+            }
+            // simply write segmented wav file to disk
+            else {
+                console.log('write', chunkName);
+                fs.writeFile(chunkName, function () {
+                  console.log('!!');
+                  // to be able to tell when to call the output callback:
+                  totalEncodedTime += _this.chunkDuration;
+                  // run arg callback only at encoding's very end 
+                  if (totalEncodedTime >= totalDuration) {
+                    callback(chunkList);
+                  }
+                }, function (err) {
+                  if (err) {
+                    console.log(err);
+                  }
+                });
               }
-            }).catch(function (err) {
-              console.error(err);
-            });
           }
 
           // incr.
