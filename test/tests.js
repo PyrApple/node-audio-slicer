@@ -53,6 +53,7 @@ testCase("Reader", () => {
 // different test format to test callback (rather than promise)
 describe('Slicer', () => {
   const INFILEPATH = "./test/example.wav";
+  const INFILEPATH_4CH = "./test/example4ch.wav";
   const OUTFOLDERPATH = "./test";
 
   describe('Slice .wav file to mp3', () => {
@@ -61,5 +62,20 @@ describe('Slicer', () => {
       slicer.slice(INFILEPATH, (chunkList) => { done(); });
     });
   });
+
+  describe('Slice .wav file to wav', () => {
+    it('should slice wav into wav chunks', (done) => {
+      let slicer = new Slicer({compress:false});
+      slicer.slice(INFILEPATH, (chunkList) => { done(); });
+    });
+  }); 
+
+  describe('Slice 4ch .wav + auto detect', () => {
+    it('should slice wav into wav chunks', (done) => {
+      let slicer = new Slicer({compress:true});
+      slicer.slice(INFILEPATH_4CH, (chunkList) => { done(); });
+    });
+  }); 
+
 
 });

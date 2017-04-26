@@ -57,37 +57,44 @@ class Slicer {
         let chunkList = [];
 
         // slicing loop
-        while( chunkStartTime <= totalDuration){
+        while( chunkStartTime < totalDuration){
 
           // handle last chunk duration (if needs to be shortened)
           chunkDuration = Math.min(chunkDuration, totalDuration - chunkStartTime);
 
           // get chunk name
-          let chunkName = storeDirPath + '/' + chunkIndex + '-' + inFileRadical + '.' + extension;
+          let chunkPath = storeDirPath + '/' + chunkIndex + '-' + inFileRadical + '.' + extension;
 
           // get chunk buffer
           let chunkBuffer = this.getChunk(metaBuffer, chunkStartTime, chunkDuration);
 
           // need mp3 outputs
-          console.log(extension)
           if( extension === 'mp3' ){
             // need to encode segmented wav buffer to mp3
-            let encoder = new Lame({ "output": chunkName, "bitrate": 128});
+            let encoder = new Lame({ "output": chunkPath, "bitrate": 128});
             encoder.setBuffer(chunkBuffer);
             encoder.encode()
               .then( () => { 
                 // to be able to tell when to call the output callback:
                 totalEncodedTime += this.chunkDuration;
-                // run arg callback only at encoding's very end 
-                if( totalEncodedTime >= totalDuration ){
-                  callback( chunkList ); 
-                }
+                // run arg callback only at encoding's very end
+                if( totalEncodedTime >= totalDuration ){ callback( chunkList ); }
               })
               .catch( (err) => {console.error(err);} );
           }
+          // need wav output
+          else{
+            fs.writeFile( chunkPath, chunkBuffer, (err) => {
+              if( err ){ throw err; }
+              // to be able to tell when to call the output callback:
+              totalEncodedTime += this.chunkDuration;
+              // run arg callback only at encoding's very end
+              if( totalEncodedTime >= totalDuration ){ callback( chunkList ); }
+            });
+          }
 
           // incr.
-          chunkList.push( { name:chunkName, start:chunkStartTime, duration: chunkDuration });
+          chunkList.push( { name:chunkPath, start:chunkStartTime, duration: chunkDuration });
           chunkIndex += 1;
           chunkStartTime += this.chunkDuration;
         }
