@@ -119,19 +119,20 @@ class Slicer {
     // get start index
     let chunkStart = dataStart + Math.floor( offset * secToByteFactor );
     // get end index
-    let chunkEnd = chunkStart + Math.ceil( chunkDuration * secToByteFactor );
+    let chunkEnd = chunkStart + Math.floor( chunkDuration * secToByteFactor );
     // get head / tail buffers (unchanged)
     let headBuffer = inputBuffer.slice(0, dataStart ); // all until 'data' included
     let tailBuffer = inputBuffer.slice( dataStart + dataLength , metaBuffer.buffer.length ); // all after data values
     // get data buffer
 
     // default scenario (no need for loop)
+    // console.log('->', chunkEnd, dataEnd, chunkEnd/dataEnd)
     if( chunkEnd <= dataEnd ){
       var dataBuffer = inputBuffer.slice( chunkStart, chunkEnd );
     }
     // loop scenario
     else{
-      console.error('loop scenario', chunkEnd, dataEnd)
+      console.error('ERROR: fetched index greater than data end index:', chunkEnd, dataEnd)
       // // loop over audio channels
       // for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
       //   // copy channel to output, concatenating: output = [input_end, input_begin]
