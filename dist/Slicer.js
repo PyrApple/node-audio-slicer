@@ -149,7 +149,7 @@ var Slicer = function () {
       // get data buffer
 
       // default scenario (no need for loop)
-      console.log('->', chunkEnd, dataEnd, chunkEnd / dataEnd);
+      // console.log('->', chunkEnd, dataEnd, chunkEnd/dataEnd)
       if (chunkEnd <= dataEnd) {
         var dataBuffer = inputBuffer.slice(chunkStart, chunkEnd);
       }
