@@ -54,7 +54,6 @@ testCase("Reader", () => {
 describe('Slicer', () => {
   const INFILEPATH = "./test/example.wav";
   const INFILEPATH_4CH = "./test/example4ch.wav";
-  const OUTFOLDERPATH = "./test";
 
   describe('Slice .wav file to mp3', () => {
     it('should slice wav into mp3 chunks', (done) => {
