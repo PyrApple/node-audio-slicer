@@ -57,14 +57,14 @@ describe('Slicer', () => {
 
   describe('Slice .wav file to mp3', () => {
     it('should slice wav into mp3 chunks', (done) => {
-      let slicer = new Slicer({compress:true});
+      let slicer = new Slicer({compress:true, duration:2, overlap:0.005});
       slicer.slice(INFILEPATH, (chunkList) => { done(); });
     });
   });
 
   describe('Slice .wav file to wav', () => {
     it('should slice wav into wav chunks', (done) => {
-      let slicer = new Slicer({compress:false});
+      let slicer = new Slicer({compress:false, duration:1});
       slicer.slice(INFILEPATH, (chunkList) => { done(); });
     });
   }); 

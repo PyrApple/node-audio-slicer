@@ -14,7 +14,8 @@ class Slicer {
     this.tmpPath = (options.tmpPath !== undefined) ? options.tmpPath : undefined;
     this.chunkDuration = (options.duration !== undefined) ? options.duration : 4; // chunk duration, in seconds
     this.compress = (options.compress !== undefined) ? options.compress : true; // output chunk audio format
-    
+    this.overlapDuration = (options.overlap !== undefined) ? options.overlap : 0; // overlap duration, in seconds
+
     // locals
     this.reader = new Reader();
   }
@@ -65,8 +66,12 @@ class Slicer {
           // get chunk name
           let chunkPath = storeDirPath + '/' + chunkIndex + '-' + inFileRadical + '.' + extension;
 
+          // define start / end offset to take into account 
+          let startOffset = (chunkStartTime === 0) ? 0 : this.overlapDuration;
+          let endOffset = ( (chunkStartTime + chunkDuration + this.overlapDuration) < totalDuration) ? this.overlapDuration : 0;
+
           // get chunk buffer
-          let chunkBuffer = this.getChunk(metaBuffer, chunkStartTime, chunkDuration);
+          let chunkBuffer = this.getChunk(metaBuffer, chunkStartTime, chunkDuration, startOffset, endOffset);
 
           // need mp3 outputs
           if( extension === 'mp3' ){
@@ -94,7 +99,7 @@ class Slicer {
           }
 
           // incr.
-          chunkList.push( { name:chunkPath, start:chunkStartTime, duration: chunkDuration });
+          chunkList.push( { name:chunkPath, start:chunkStartTime, duration: chunkDuration, overlapStart: startOffset, overlapEnd: endOffset });
           chunkIndex += 1;
           chunkStartTime += this.chunkDuration;
         }
@@ -106,7 +111,7 @@ class Slicer {
   * starting at offset sec, of duration chunkDuration sec. Handles loop
   * (i.e. if offset >= buffer duration)
   **/
-  getChunk(metaBuffer, offset, chunkDuration){
+  getChunk(metaBuffer, offset, chunkDuration, startOffset, endOffset){
 
     // utils
     // console.log('1', metaBuffer.dataField, metaBuffer.format, metaBuffer.buffer)
@@ -117,9 +122,9 @@ class Slicer {
     let inputBuffer = metaBuffer.buffer;
 
     // get start index
-    let chunkStart = dataStart + Math.floor( offset * secToByteFactor );
+    let chunkStart = dataStart + Math.ceil( (offset - startOffset) * secToByteFactor );
     // get end index
-    let chunkEnd = chunkStart + Math.floor( chunkDuration * secToByteFactor );
+    let chunkEnd = chunkStart + Math.floor( (chunkDuration + endOffset) * secToByteFactor );
     // get head / tail buffers (unchanged)
     let headBuffer = inputBuffer.slice(0, dataStart ); // all until 'data' included
     let tailBuffer = inputBuffer.slice( dataStart + dataLength , metaBuffer.buffer.length ); // all after data values
