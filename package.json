@@ -1,7 +1,7 @@
 {
   "name": "node-audio-slicer",
   "description": "Read-Slice-Write audio files (mp3 and wav) from Node.js",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "homepage": "https://github.com/PyrApple/node-audio-slicer",
   "bugs": {
     "url": "https://github.com/PyrApple/node-audio-slicer/issues"
@@ -11,12 +11,12 @@
     "email": "davipoir@gmail.com",
     "url": "pyrapple.github.io"
   },
-"licenses": [
-  {
-    "type": "MIT",
-    "url": "https://github.com/PyrApple/node-audio-slicer/blob/master/LICENSE"
-  }
-], 
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/PyrApple/node-audio-slicer/blob/master/LICENSE"
+    }
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/PyrApple/node-audio-slicer.git"
