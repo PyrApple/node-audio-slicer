@@ -56,6 +56,7 @@ class Slicer {
         let chunkIndex = 0;
         let totalEncodedTime = 0;
         let chunkList = [];
+        let initStartBitOffset = 0;
 
         // slicing loop
         while( chunkStartTime < totalDuration){
@@ -69,9 +70,24 @@ class Slicer {
           // define start / end offset to take into account 
           let startOffset = (chunkStartTime === 0) ? 0 : this.overlapDuration;
           let endOffset = ( (chunkStartTime + chunkDuration + this.overlapDuration) < totalDuration) ? this.overlapDuration : 0;
+          let chunkStartBitIndex = metaBuffer.dataStart + (chunkStartTime - startOffset) * metaBuffer.secToByteFactor;
+          let chunkEndBitIndex = chunkStartBitIndex + (chunkDuration + endOffset) * metaBuffer.secToByteFactor;
+
+          // tweek start / stop offset times to make sure they do not fall in the middle of a sample's bits 
+          // (and update startOffset / endOffset to send exact values in output chunkList for overlap compensation in client code)
+          if( chunkIndex !== 0 ){ // would not be wise to fetch index under data start for first chunk
+            chunkStartBitIndex = initStartBitOffset + Math.floor( chunkStartBitIndex / metaBuffer.bitPerSample ) * metaBuffer.bitPerSample;
+            startOffset = chunkStartTime - (chunkStartBitIndex - metaBuffer.dataStart) / metaBuffer.secToByteFactor;
+
+            chunkEndBitIndex = Math.ceil( chunkEndBitIndex / metaBuffer.bitPerSample ) * metaBuffer.bitPerSample;
+            chunkEndBitIndex = Math.min( chunkEndBitIndex, metaBuffer.dataStart + metaBuffer.dataLength ); // reduce if above file duration
+            endOffset = (chunkEndBitIndex - chunkStartBitIndex) / metaBuffer.secToByteFactor - chunkDuration;
+          }
+          // keep track off init dta start offset
+          else{ initStartBitOffset = chunkStartBitIndex % metaBuffer.bitPerSample; }
 
           // get chunk buffer
-          let chunkBuffer = this.getChunk(metaBuffer, chunkStartTime, chunkDuration, startOffset, endOffset);
+          let chunkBuffer = this.getChunk(metaBuffer, chunkStartTime, chunkDuration, chunkStartBitIndex, chunkEndBitIndex);
 
           // need mp3 outputs
           if( extension === 'mp3' ){
@@ -111,27 +127,19 @@ class Slicer {
   * starting at offset sec, of duration chunkDuration sec. Handles loop
   * (i.e. if offset >= buffer duration)
   **/
-  getChunk(metaBuffer, offset, chunkDuration, startOffset, endOffset){
+  getChunk(metaBuffer, offset, chunkDuration, chunkStart, chunkEnd){
 
     // utils
-    // console.log('1', metaBuffer.dataField, metaBuffer.format, metaBuffer.buffer)
     let dataStart = metaBuffer.dataStart;
     let dataLength = metaBuffer.dataLength;
     let dataEnd = dataStart + dataLength;
-    let secToByteFactor = metaBuffer.secToByteFactor;
     let inputBuffer = metaBuffer.buffer;
 
-    // get start index
-    let chunkStart = dataStart + Math.ceil( (offset - startOffset) * secToByteFactor );
-    // get end index
-    let chunkEnd = chunkStart + Math.floor( (chunkDuration + endOffset) * secToByteFactor );
     // get head / tail buffers (unchanged)
     let headBuffer = inputBuffer.slice(0, dataStart ); // all until 'data' included
     let tailBuffer = inputBuffer.slice( dataStart + dataLength , metaBuffer.buffer.length ); // all after data values
-    // get data buffer
 
-    // default scenario (no need for loop)
-    // console.log('->', chunkEnd, dataEnd, chunkEnd/dataEnd)
+    // get data buffer: default scenario (no need for loop)
     if( chunkEnd <= dataEnd ){
       var dataBuffer = inputBuffer.slice( chunkStart, chunkEnd );
     }
@@ -204,6 +212,7 @@ class Reader {
           numberOfChannels: wavInfo.format.numberOfChannels,
           sampleRate: wavInfo.format.sampleRate,
           secToByteFactor: wavInfo.format.secToByteFactor,
+          bitPerSample: wavInfo.format.bitPerSample,
         };
         // resolve
         return metaBuffer;

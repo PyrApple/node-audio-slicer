@@ -70,6 +70,7 @@ var Slicer = function () {
         var chunkIndex = 0;
         var totalEncodedTime = 0;
         var chunkList = [];
+        var initStartBitOffset = 0;
 
         // slicing loop
         while (chunkStartTime < totalDuration) {
@@ -83,9 +84,27 @@ var Slicer = function () {
           // define start / end offset to take into account 
           var startOffset = chunkStartTime === 0 ? 0 : _this.overlapDuration;
           var endOffset = chunkStartTime + chunkDuration + _this.overlapDuration < totalDuration ? _this.overlapDuration : 0;
+          var chunkStartBitIndex = metaBuffer.dataStart + (chunkStartTime - startOffset) * metaBuffer.secToByteFactor;
+          var chunkEndBitIndex = chunkStartBitIndex + (chunkDuration + endOffset) * metaBuffer.secToByteFactor;
+
+          // tweek start / stop offset times to make sure they do not fall in the middle of a sample's bits 
+          // (and update startOffset / endOffset to send exact values in output chunkList for overlap compensation in client code)
+          if (chunkIndex !== 0) {
+            // would not be wise to fetch index under data start for first chunk
+            chunkStartBitIndex = initStartBitOffset + Math.floor(chunkStartBitIndex / metaBuffer.bitPerSample) * metaBuffer.bitPerSample;
+            startOffset = chunkStartTime - (chunkStartBitIndex - metaBuffer.dataStart) / metaBuffer.secToByteFactor;
+
+            chunkEndBitIndex = Math.ceil(chunkEndBitIndex / metaBuffer.bitPerSample) * metaBuffer.bitPerSample;
+            chunkEndBitIndex = Math.min(chunkEndBitIndex, metaBuffer.dataStart + metaBuffer.dataLength); // reduce if above file duration
+            endOffset = (chunkEndBitIndex - chunkStartBitIndex) / metaBuffer.secToByteFactor - chunkDuration;
+          }
+          // keep track off init dta start offset
+          else {
+              initStartBitOffset = chunkStartBitIndex % metaBuffer.bitPerSample;
+            }
 
           // get chunk buffer
-          var chunkBuffer = _this.getChunk(metaBuffer, chunkStartTime, chunkDuration, startOffset, endOffset);
+          var chunkBuffer = _this.getChunk(metaBuffer, chunkStartTime, chunkDuration, chunkStartBitIndex, chunkEndBitIndex);
 
           // need mp3 outputs
           if (extension === 'mp3') {
@@ -134,27 +153,19 @@ var Slicer = function () {
 
   }, {
     key: "getChunk",
-    value: function getChunk(metaBuffer, offset, chunkDuration, startOffset, endOffset) {
+    value: function getChunk(metaBuffer, offset, chunkDuration, chunkStart, chunkEnd) {
 
       // utils
-      // console.log('1', metaBuffer.dataField, metaBuffer.format, metaBuffer.buffer)
       var dataStart = metaBuffer.dataStart;
       var dataLength = metaBuffer.dataLength;
       var dataEnd = dataStart + dataLength;
-      var secToByteFactor = metaBuffer.secToByteFactor;
       var inputBuffer = metaBuffer.buffer;
 
-      // get start index
-      var chunkStart = dataStart + Math.ceil((offset - startOffset) * secToByteFactor);
-      // get end index
-      var chunkEnd = chunkStart + Math.floor((chunkDuration + endOffset) * secToByteFactor);
       // get head / tail buffers (unchanged)
       var headBuffer = inputBuffer.slice(0, dataStart); // all until 'data' included
       var tailBuffer = inputBuffer.slice(dataStart + dataLength, metaBuffer.buffer.length); // all after data values
-      // get data buffer
 
-      // default scenario (no need for loop)
-      // console.log('->', chunkEnd, dataEnd, chunkEnd/dataEnd)
+      // get data buffer: default scenario (no need for loop)
       if (chunkEnd <= dataEnd) {
         var dataBuffer = inputBuffer.slice(chunkStart, chunkEnd);
       }
@@ -170,20 +181,6 @@ var Slicer = function () {
           //   ));
           // }
         }
-      // console.log(dataBuffer.length / metaBuffer.bitPerSample)
-      // console.log(dataBuffer.length)
-      // BELOW FADE IN / OUT IS BAD IDEA: NOT MANIPULATING FLOAT SIGNAL VALUES, BUT ENCODED DATA BITES (should decode before applying any kind of gain)
-      // // handle fade-in / fade-out overlap (lame encoding adds weird noise at chunk's start and end, this way one doesn't hear them)
-      // let index = Math.floor(startOffset * secToByteFactor);
-      // for( let i = 0; i < index; i++ ){
-      //   console.log(dataBuffer[i]);
-      //   dataBuffer[i] = Math.round( dataBuffer[i] * (i / (index-1) ) );
-      //   console.log('-', dataBuffer[i]);
-      // }
-      // index = Math.floor(endOffset * secToByteFactor);
-      // for( let i = dataBuffer.length - index; i < dataBuffer.length; i++ ){
-      //   dataBuffer[i] = Math.round( dataBuffer[i] * (dataBuffer.length - i - 1) / (index-1) );
-      // }    
       // update data length descriptor in head buffer
       headBuffer.writeUIntLE(dataBuffer.length, headBuffer.length - BYTE_LENGTH, BYTE_LENGTH);
 
@@ -250,7 +247,8 @@ var Reader = function () {
         dataLength: wavInfo.descriptors.get('data').length,
         numberOfChannels: wavInfo.format.numberOfChannels,
         sampleRate: wavInfo.format.sampleRate,
-        secToByteFactor: wavInfo.format.secToByteFactor
+        secToByteFactor: wavInfo.format.secToByteFactor,
+        bitPerSample: wavInfo.format.bitPerSample
       };
       // resolve
       return metaBuffer;
