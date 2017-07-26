@@ -1,7 +1,7 @@
 {
   "name": "node-audio-slicer",
   "description": "Read-Slice-Write audio files (mp3 and wav) from Node.js",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "homepage": "https://github.com/PyrApple/node-audio-slicer",
   "bugs": {
     "url": "https://github.com/PyrApple/node-audio-slicer/issues"
