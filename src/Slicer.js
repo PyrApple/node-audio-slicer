@@ -29,8 +29,7 @@ class Slicer {
     }
 
     // load audio file
-    this.reader.loadBuffer(inFilePath)
-      .then((buffer) => {
+    this.reader.loadBuffer(inFilePath, (buffer) => {
         // get buffer chunk
         let metaBuffer = this.reader.interpretHeaders(buffer);
 
@@ -187,19 +186,11 @@ class Reader {
      *
      * @param {string} filePath
      */
-    loadBuffer( filePath ){
-      const promise = new Promise((resolve, reject) => {
-        fs.readFile( filePath, (err, buffer) => {
-          // handle read error
-          if (err) { 
-            console.error(err)
-            reject(err);
-          }
-          // read info from wav buffer
-          resolve(buffer);
-        });    
-      });
-      return promise;
+    loadBuffer( filePath, callback ){
+      try {
+        let buffer = fs.readFileSync(filePath);
+        callback(buffer); 
+      } catch (err) { console.log(err); }    
     }
 
     interpretHeaders(buffer) {
