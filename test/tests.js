@@ -11,42 +11,34 @@ let wav = require('node-wav');
 const Reader = require("../dist/index").Reader;
 const Slicer = require("../dist/index").Slicer;
 
-testCase("Reader", () => {
+describe('Reader', () => {
+  it('should read infos and extract buffer', (done) => {
+
   const INFILEPATH = "./test/example.wav";
 
-  /**
-   * @testname Read .wav file
-   * read a .wav file, extract node buffer and info
-   */
-  assertions("Read .wav file", () => {
+  const reader = new Reader();
 
-    const reader = new Reader();
+  reader.loadBuffer(INFILEPATH, (buffer) => {
 
+      let metaBuffer = reader.interpretHeaders(buffer);
 
-    // assert.isTrue(true);
+      // assert.isTrue(true);
 
-    return reader.loadBuffer(INFILEPATH)
-      .then((buffer) => {
+      let refBuffer = fs.readFileSync(INFILEPATH);
+      let refMetaBuffer = wav.decode(refBuffer);
 
-        let metaBuffer = reader.interpretHeaders(buffer);
+      // check number of channels
+      let refNumberOfChannels = refMetaBuffer.channelData.length;
+      assert.equal(refNumberOfChannels, metaBuffer.numberOfChannels);
 
-        // assert.isTrue(true);
+      // check file duration
+      let refDuration = refMetaBuffer.channelData[1].length / refMetaBuffer.sampleRate;
+      let duration = metaBuffer.dataLength / metaBuffer.secToByteFactor
+      assert.equal(refDuration, duration);
+      done();
 
-        let refBuffer = fs.readFileSync(INFILEPATH);
-        let refMetaBuffer = wav.decode(refBuffer);
-
-        // check number of channels
-        let refNumberOfChannels = refMetaBuffer.channelData.length;
-        assert.equal(refNumberOfChannels, metaBuffer.numberOfChannels);
-
-        // check file duration
-        let refDuration = refMetaBuffer.channelData[1].length / refMetaBuffer.sampleRate;
-        let duration = metaBuffer.dataLength / metaBuffer.secToByteFactor
-        assert.equal(refDuration, duration);
-
-      });
+    });
   });
-
 });
 
 
@@ -67,14 +59,14 @@ describe('Slicer', () => {
       let slicer = new Slicer({compress:false, duration:1});
       slicer.slice(INFILEPATH, (chunkList) => { done(); });
     });
-  }); 
+  });
 
   describe('Slice 4ch .wav + auto detect', () => {
     it('should slice wav into wav chunks', (done) => {
       let slicer = new Slicer({compress:true});
       slicer.slice(INFILEPATH_4CH, (chunkList) => { done(); });
     });
-  }); 
+  });
 
 
 });
