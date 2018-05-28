@@ -32,6 +32,8 @@ var Slicer = function () {
   _createClass(Slicer, [{
     key: "slice",
     value: function slice(inFilePath, callback) {
+      var _this = this;
+
       // only support wav and mp3 files
       var inFileExtension = inFilePath.split(".").pop();
       if (inFileExtension !== 'wav') {
@@ -41,94 +43,105 @@ var Slicer = function () {
 
       // load audio file
       this.reader.loadBuffer(inFilePath, function (buffer) {
-        // // get buffer chunk
-        // let metaBuffer = this.reader.interpretHeaders(buffer);
+        // get buffer chunk
+        var metaBuffer = _this.reader.interpretHeaders(buffer);
 
-        // // get chunk path radical and extension
-        // let inPath = inFilePath.substr(0, inFilePath.lastIndexOf('/') + 1);
-        // let inFileName = inFilePath.split("/").pop();
-        // let inFileRadical = inFileName.substr(0, inFileName.lastIndexOf("."));
+        // get chunk path radical and extension
+        var inPath = inFilePath.substr(0, inFilePath.lastIndexOf('/') + 1);
+        var inFileName = inFilePath.split("/").pop();
+        var inFileRadical = inFileName.substr(0, inFileName.lastIndexOf("."));
 
-        // // set extension based on compression option (compress to mp3 if <= 2 channels)
-        // let extension = inFileExtension;
-        // if( this.compress && metaBuffer.numberOfChannels <= 2 ){
-        //   extension = 'mp3'; 
-        // }     
+        // set extension based on compression option (compress to mp3 if <= 2 channels)
+        var extension = inFileExtension;
+        if (_this.compress && metaBuffer.numberOfChannels <= 2) {
+          extension = 'mp3';
+        }
 
-        // // create sub-directory to store sliced files
-        // let storeDirPath = inPath + inFileRadical;
-        // if (!fs.existsSync(storeDirPath)){ fs.mkdirSync(storeDirPath); }
+        // create sub-directory to store sliced files
+        var storeDirPath = inPath + inFileRadical;
+        if (!fs.existsSync(storeDirPath)) {
+          fs.mkdirSync(storeDirPath);
+        }
 
-        // // init slicing loop 
-        // let totalDuration = metaBuffer.dataLength / metaBuffer.secToByteFactor;
-        // let chunkStartTime = 0;
-        // let chunkDuration = this.chunkDuration;
-        // let chunkIndex = 0;
-        // let totalEncodedTime = 0;
-        // let chunkList = [];
-        // let initStartBitOffset = 0;
+        // init slicing loop 
+        var totalDuration = metaBuffer.dataLength / metaBuffer.secToByteFactor;
+        var chunkStartTime = 0;
+        var chunkDuration = _this.chunkDuration;
+        var chunkIndex = 0;
+        var totalEncodedTime = 0;
+        var chunkList = [];
+        var initStartBitOffset = 0;
 
-        // // slicing loop
-        // while( chunkStartTime < totalDuration){
+        // slicing loop
+        while (chunkStartTime < totalDuration) {
 
-        //   // handle last chunk duration (if needs to be shortened)
-        //   chunkDuration = Math.min(chunkDuration, totalDuration - chunkStartTime);
+          // handle last chunk duration (if needs to be shortened)
+          chunkDuration = Math.min(chunkDuration, totalDuration - chunkStartTime);
 
-        //   // get chunk name
-        //   let chunkPath = storeDirPath + '/' + chunkIndex + '-' + inFileRadical + '.' + extension;
+          // get chunk name
+          var chunkPath = storeDirPath + '/' + chunkIndex + '-' + inFileRadical + '.' + extension;
 
-        //   // define start / end offset to take into account 
-        //   let startOffset = (chunkStartTime === 0) ? 0 : this.overlapDuration;
-        //   let endOffset = ( (chunkStartTime + chunkDuration + this.overlapDuration) < totalDuration) ? this.overlapDuration : 0;
-        //   let chunkStartBitIndex = metaBuffer.dataStart + (chunkStartTime - startOffset) * metaBuffer.secToByteFactor;
-        //   let chunkEndBitIndex = chunkStartBitIndex + (chunkDuration + endOffset) * metaBuffer.secToByteFactor;
+          // define start / end offset to take into account 
+          var startOffset = chunkStartTime === 0 ? 0 : _this.overlapDuration;
+          var endOffset = chunkStartTime + chunkDuration + _this.overlapDuration < totalDuration ? _this.overlapDuration : 0;
+          var chunkStartBitIndex = metaBuffer.dataStart + (chunkStartTime - startOffset) * metaBuffer.secToByteFactor;
+          var chunkEndBitIndex = chunkStartBitIndex + (chunkDuration + endOffset) * metaBuffer.secToByteFactor;
 
-        //   // tweek start / stop offset times to make sure they do not fall in the middle of a sample's bits 
-        //   // (and update startOffset / endOffset to send exact values in output chunkList for overlap compensation in client code)
-        //   if( chunkIndex !== 0 ){ // would not be wise to fetch index under data start for first chunk
-        //     chunkStartBitIndex = initStartBitOffset + Math.floor( chunkStartBitIndex / metaBuffer.bitPerSample ) * metaBuffer.bitPerSample;
-        //     startOffset = chunkStartTime - (chunkStartBitIndex - metaBuffer.dataStart) / metaBuffer.secToByteFactor;
+          // tweek start / stop offset times to make sure they do not fall in the middle of a sample's bits 
+          // (and update startOffset / endOffset to send exact values in output chunkList for overlap compensation in client code)
+          if (chunkIndex !== 0) {
+            // would not be wise to fetch index under data start for first chunk
+            chunkStartBitIndex = initStartBitOffset + Math.floor(chunkStartBitIndex / metaBuffer.bitPerSample) * metaBuffer.bitPerSample;
+            startOffset = chunkStartTime - (chunkStartBitIndex - metaBuffer.dataStart) / metaBuffer.secToByteFactor;
 
-        //     chunkEndBitIndex = Math.ceil( chunkEndBitIndex / metaBuffer.bitPerSample ) * metaBuffer.bitPerSample;
-        //     chunkEndBitIndex = Math.min( chunkEndBitIndex, metaBuffer.dataStart + metaBuffer.dataLength ); // reduce if above file duration
-        //     endOffset = (chunkEndBitIndex - chunkStartBitIndex) / metaBuffer.secToByteFactor - chunkDuration;
-        //   }
-        //   // keep track off init dta start offset
-        //   else{ initStartBitOffset = chunkStartBitIndex % metaBuffer.bitPerSample; }
+            chunkEndBitIndex = Math.ceil(chunkEndBitIndex / metaBuffer.bitPerSample) * metaBuffer.bitPerSample;
+            chunkEndBitIndex = Math.min(chunkEndBitIndex, metaBuffer.dataStart + metaBuffer.dataLength); // reduce if above file duration
+            endOffset = (chunkEndBitIndex - chunkStartBitIndex) / metaBuffer.secToByteFactor - chunkDuration;
+          }
+          // keep track off init dta start offset
+          else {
+              initStartBitOffset = chunkStartBitIndex % metaBuffer.bitPerSample;
+            }
 
-        //   // get chunk buffer
-        //   let chunkBuffer = this.getChunk(metaBuffer, chunkStartTime, chunkDuration, chunkStartBitIndex, chunkEndBitIndex);
+          // get chunk buffer
+          var chunkBuffer = _this.getChunk(metaBuffer, chunkStartTime, chunkDuration, chunkStartBitIndex, chunkEndBitIndex);
 
-        //   // need mp3 outputs
-        //   if( extension === 'mp3' ){
-        //     // need to encode segmented wav buffer to mp3
-        //     let encoder = new Lame({ "output": chunkPath, "bitrate": 128});
-        //     encoder.setBuffer(chunkBuffer);
-        //     encoder.encode()
-        //       .then( () => { 
-        //         // to be able to tell when to call the output callback:
-        //         totalEncodedTime += this.chunkDuration;
-        //         // run arg callback only at encoding's very end
-        //         if( totalEncodedTime >= totalDuration ){ callback( chunkList ); }
-        //       })
-        //       .catch( (err) => {console.error(err);} );
-        //   }
-        //   // need wav output
-        //   else{
-        //     fs.writeFile( chunkPath, chunkBuffer, (err) => {
-        //       if( err ){ throw err; }
-        //       // to be able to tell when to call the output callback:
-        //       totalEncodedTime += this.chunkDuration;
-        //       // run arg callback only at encoding's very end
-        //       if( totalEncodedTime >= totalDuration ){ callback( chunkList ); }
-        //     });
-        //   }
+          // need mp3 outputs
+          if (extension === 'mp3') {
+            // need to encode segmented wav buffer to mp3
+            var encoder = new Lame({ "output": chunkPath, "bitrate": 128 });
+            encoder.setBuffer(chunkBuffer);
+            encoder.encode().then(function () {
+              // to be able to tell when to call the output callback:
+              totalEncodedTime += _this.chunkDuration;
+              // run arg callback only at encoding's very end
+              if (totalEncodedTime >= totalDuration) {
+                callback(chunkList);
+              }
+            }).catch(function (err) {
+              console.error(err);
+            });
+          }
+          // need wav output
+          else {
+              fs.writeFile(chunkPath, chunkBuffer, function (err) {
+                if (err) {
+                  throw err;
+                }
+                // to be able to tell when to call the output callback:
+                totalEncodedTime += _this.chunkDuration;
+                // run arg callback only at encoding's very end
+                if (totalEncodedTime >= totalDuration) {
+                  callback(chunkList);
+                }
+              });
+            }
 
-        //   // incr.
-        //   chunkList.push( { name:chunkPath, start:chunkStartTime, duration: chunkDuration, overlapStart: startOffset, overlapEnd: endOffset });
-        //   chunkIndex += 1;
-        //   chunkStartTime += this.chunkDuration;
-        // }
+          // incr.
+          chunkList.push({ name: chunkPath, start: chunkStartTime, duration: chunkDuration, overlapStart: startOffset, overlapEnd: endOffset });
+          chunkIndex += 1;
+          chunkStartTime += _this.chunkDuration;
+        }
       });
     }
 
