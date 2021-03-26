@@ -297,7 +297,7 @@ function generateHeader(metaBuffer, length) {
   const dataLength = length || MAX_WAV;
   const fileSize = dataLength + headerLength;
   const header = new Buffer.alloc(headerLength);
-  const offset = 0;
+  let offset = 0;
 
   // write the "RIFF" identifier
   RIFF.copy(header, offset);
