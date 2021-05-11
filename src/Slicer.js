@@ -15,6 +15,7 @@ class Slicer {
     this.chunkDuration = (options.duration !== undefined) ? options.duration : 4; // chunk duration, in seconds
     this.compress = (options.compress !== undefined) ? options.compress : true; // output chunk audio format
     this.overlapDuration = (options.overlap !== undefined) ? options.overlap : 0; // overlap duration, in seconds
+    this.generateChunksWavHeader = options.generateChunksWavHeader !== undefined ? options.generateChunksWavHeader : true; // generate valid wav header on outputted chunks
 
     // locals
     this.reader = new Reader();
@@ -31,12 +32,12 @@ class Slicer {
     // load audio file
     this.reader.loadBuffer(inFilePath, (buffer) => {
         // get buffer chunk
-        let metaBuffer = this.reader.interpretHeaders(buffer);
+        const metaBuffer = this.reader.interpretHeaders(buffer);
 
         // get chunk path radical and extension
-        let inPath = inFilePath.substr(0, inFilePath.lastIndexOf('/') + 1);
-        let inFileName = inFilePath.split("/").pop();
-        let inFileRadical = inFileName.substr(0, inFileName.lastIndexOf("."));
+        const inPath = inFilePath.substr(0, inFilePath.lastIndexOf('/') + 1);
+        const inFileName = inFilePath.split("/").pop();
+        const inFileRadical = inFileName.substr(0, inFileName.lastIndexOf("."));
         
         // set extension based on compression option (compress to mp3 if <= 2 channels)
         let extension = inFileExtension;
@@ -45,11 +46,11 @@ class Slicer {
         }     
 
         // create sub-directory to store sliced files
-        let storeDirPath = inPath + inFileRadical;
+        const storeDirPath = inPath + inFileRadical;
         if (!fs.existsSync(storeDirPath)){ fs.mkdirSync(storeDirPath); }
 
         // init slicing loop 
-        let totalDuration = metaBuffer.dataLength / metaBuffer.secToByteFactor;
+        const totalDuration = metaBuffer.dataLength / metaBuffer.secToByteFactor;
         let chunkStartTime = 0;
         let chunkDuration = this.chunkDuration;
         let chunkIndex = 0;
@@ -129,38 +130,27 @@ class Slicer {
   getChunk(metaBuffer, offset, chunkDuration, chunkStart, chunkEnd){
 
     // utils
-    let dataStart = metaBuffer.dataStart;
-    let dataLength = metaBuffer.dataLength;
-    let dataEnd = dataStart + dataLength;
-    let inputBuffer = metaBuffer.buffer;
+    const dataStart = metaBuffer.dataStart;
+    const dataLength = metaBuffer.dataLength;
+    const dataEnd = dataStart + dataLength;
+    const inputBuffer = metaBuffer.buffer;
 
     // get head / tail buffers (unchanged)
-    let headBuffer = inputBuffer.slice(0, dataStart ); // all until 'data' included
-    let tailBuffer = inputBuffer.slice( dataStart + dataLength , metaBuffer.buffer.length ); // all after data values
+    const headBuffer = inputBuffer.slice(0, dataStart ); // all until 'data' included
+    const tailBuffer = inputBuffer.slice( dataStart + dataLength , metaBuffer.buffer.length ); // all after data values
 
     // get data buffer: default scenario (no need for loop)
-    if( chunkEnd <= dataEnd ){
-      var dataBuffer = inputBuffer.slice( chunkStart, chunkEnd );
-    }
-    // loop scenario
-    else{
-      console.error('ERROR: fetched index greater than data end index:', chunkEnd, dataEnd)
-      // // loop over audio channels
-      // for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
-      //   // copy channel to output, concatenating: output = [input_end, input_begin]
-      //   outputBuffer.getChannelData(ch).set( Float32Concat( 
-      //     buffer.getChannelData(ch).slice( startIndex, buffer.length ),
-      //     buffer.getChannelData(ch).slice( 0, endIndex - buffer.length )
-      //   ));
-      // }
-    }
+    if( chunkEnd > dataEnd ) console.error('ERROR: fetched index greater than data end index:', chunkEnd, dataEnd);
+    const dataBuffer = inputBuffer.slice( chunkStart, chunkEnd );
+    
     // update data length descriptor in head buffer
     headBuffer.writeUIntLE(dataBuffer.length, headBuffer.length - BYTE_LENGTH, BYTE_LENGTH);
-
-    // concatenate head / data / tail buffers
-    let outputBuffer = Buffer.concat([headBuffer, dataBuffer, tailBuffer], headBuffer.length + tailBuffer.length + dataBuffer.length);
-
-    return outputBuffer;
+    if (this.generateChunksWavHeader) {
+        const wavPcmLength = headBuffer.length + tailBuffer.length + dataBuffer.length;
+        const headerBuffer = generateHeader(metaBuffer, wavPcmLength)
+        // concatenate head / data / tail buffers
+        return Buffer.concat([headerBuffer, headBuffer, dataBuffer, tailBuffer], headerBuffer.length + wavPcmLength);
+      } else return Buffer.concat([headBuffer, dataBuffer, tailBuffer], headBuffer.length + tailBuffer.length + dataBuffer.length);
   }
 
 }
@@ -188,15 +178,15 @@ class Reader {
      */
     loadBuffer( filePath, callback ){
       try {
-        let buffer = fs.readFileSync(filePath);
+        const buffer = fs.readFileSync(filePath);
         callback(buffer); 
       } catch (err) { console.log(err); }    
     }
 
     interpretHeaders(buffer) {
-        let wavInfo = this.wavFormatReader.getWavInfos(buffer);
+        const wavInfo = this.wavFormatReader.getWavInfos(buffer);
         // extract relevant info only
-        let metaBuffer = {
+        const metaBuffer = {
           buffer: buffer,
           dataStart: wavInfo.descriptors.get('data').start,
           dataLength: wavInfo.descriptors.get('data').length,
@@ -247,7 +237,7 @@ class WavFormatReader {
       let index = 0;
       let descriptor = '';
       let chunkLength = 0;
-      let descriptors = new Map();
+      const descriptors = new Map();
 
       // search for buffer descriptors
       let continueReading = true
@@ -286,3 +276,85 @@ class WavFormatReader {
     }
 
 }
+
+
+/** Credits goes for https://github.com/karlwestin/node-waveheader/blob/master/index.js
+ * Slightly modified code to generate wav headers
+ */
+function generateHeader(metaBuffer, length) {
+  const RIFF = new Buffer.from('RIFF');
+  const WAVE = new Buffer.from('WAVE');
+  const fmt = new Buffer.from('fmt ');
+  const data = new Buffer.from('data');
+
+  const MAX_WAV = 4294967295 - 100;
+  const format = 1; // raw PCM
+  const channels = metaBuffer.numberOfChannels || 1;
+  const sampleRate = metaBuffer.sampleRate || 44100;
+  const bitDepth = metaBuffer.bitPerSample || 16;
+
+  const headerLength = 44;
+  const dataLength = length || MAX_WAV;
+  const fileSize = dataLength + headerLength;
+  const header = new Buffer.alloc(headerLength);
+  let offset = 0;
+
+  // write the "RIFF" identifier
+  RIFF.copy(header, offset);
+  offset += RIFF.length;
+
+  // write the file size minus the identifier and this 32-bit int
+  header.writeUInt32LE(fileSize - 8, offset);
+  offset += 4;
+
+  // write the "WAVE" identifier
+  WAVE.copy(header, offset);
+  offset += WAVE.length;
+
+  // write the "fmt " sub-chunk identifier
+  fmt.copy(header, offset);
+  offset += fmt.length;
+
+  // write the size of the "fmt " chunk
+  // XXX: value of 16 is hard-coded for raw PCM format. other formats have
+  // different size.
+  header.writeUInt32LE(16, offset);
+  offset += 4;
+
+  // write the audio format code
+  header.writeUInt16LE(format, offset);
+  offset += 2;
+
+  // write the number of channels
+  header.writeUInt16LE(channels, offset);
+  offset += 2;
+
+  // write the sample rate
+  header.writeUInt32LE(sampleRate, offset);
+  offset += 4;
+
+  // write the byte rate
+  var byteRate = sampleRate * channels * bitDepth / 8;
+  header.writeUInt32LE(byteRate, offset);
+  offset += 4;
+
+  // write the block align
+  var blockAlign = channels * bitDepth / 8;
+  header.writeUInt16LE(blockAlign, offset);
+  offset += 2;
+
+  // write the bits per sample
+  header.writeUInt16LE(bitDepth, offset);
+  offset += 2;
+
+  // write the "data" sub-chunk ID
+  data.copy(header, offset);
+  offset += data.length;
+
+  // write the remaining length of the rest of the data
+  header.writeUInt32LE(dataLength, offset);
+  offset += 4;
+
+  // flush the header and after that pass-through "dataLength" bytes
+  return header;
+};
